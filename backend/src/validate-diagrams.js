@@ -27,12 +27,17 @@ function initMermaid() {
 export async function validateMermaid(definition) {
   try {
     initMermaid()
-    await mermaid.parse(definition.trim())
+    const trimmed = definition.trim()
+    if (!trimmed) {
+      return { valid: false, error: 'Empty Mermaid definition' }
+    }
+    await mermaid.parse(trimmed)
     return { valid: true, error: null }
   } catch (error) {
+    const errorMsg = error.message || error.str || String(error)
     return {
       valid: false,
-      error: error.message || error.str || String(error),
+      error: errorMsg,
     }
   }
 }
@@ -44,7 +49,11 @@ export async function validateMermaid(definition) {
  */
 export async function validatePlantUML(definition) {
   try {
-    const encoded = encode(definition.trim())
+    const trimmed = definition.trim()
+    if (!trimmed) {
+      return { valid: false, error: 'Empty PlantUML definition' }
+    }
+    const encoded = encode(trimmed)
     // Fetch the txt version to check for errors
     const response = await fetch(`https://www.plantuml.com/plantuml/txt/${encoded}`)
     if (!response.ok) {

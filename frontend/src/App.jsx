@@ -16,23 +16,49 @@ function AnalysisProvider({ children }) {
 
   const analyzeFile = useCallback(async (file) => {
     if (!file) return
+    console.log('[Frontend] Starting analysis for file:', file.name, 'size:', file.size)
     setState({ status: 'loading', markdown: '', fileName: file.name, error: '' })
     const formData = new FormData()
     formData.append('file', file)
     try {
+      console.log('[Frontend] Sending request to:', `${API_BASE_URL}/analyze`)
       const response = await fetch(`${API_BASE_URL}/analyze`, {
         method: 'POST',
         body: formData,
       })
+      console.log('[Frontend] Response status:', response.status, response.statusText)
+      
       if (!response.ok) {
-        throw new Error('Syntra could not reach the analyst core.')
+        let errorMessage = 'Syntra could not reach the analyst core.'
+        try {
+          const errorData = await response.json()
+          console.error('[Frontend] Error response:', errorData)
+          errorMessage = errorData.error || errorData.details || errorMessage
+        } catch (e) {
+          console.error('[Frontend] Failed to parse error response:', e)
+          const errorText = await response.text()
+          console.error('[Frontend] Error response text:', errorText.substring(0, 500))
+        }
+        throw new Error(errorMessage)
       }
+      
       const payload = await response.json()
+      console.log('[Frontend] Response received, has markdown:', !!payload?.markdown)
+      
       if (!payload?.markdown) {
+        console.error('[Frontend] Empty markdown in response:', payload)
         throw new Error('The analyst returned an empty dossier.')
       }
+      
+      console.log('[Frontend] Analysis complete, markdown length:', payload.markdown.length)
       setState({ status: 'ready', markdown: payload.markdown, fileName: file.name, error: '' })
     } catch (err) {
+      console.error('[Frontend] Analysis error:', err)
+      console.error('[Frontend] Error details:', {
+        message: err.message,
+        name: err.name,
+        stack: err.stack,
+      })
       setState({
         status: 'error',
         markdown: '',
@@ -293,7 +319,81 @@ function MermaidDiagram({ definition }) {
 
   useEffect(() => {
     let cancelled = false
-    mermaid.initialize({ startOnLoad: false, theme: 'dark', securityLevel: 'loose' })
+    
+    // Custom Syntra dark theme colors matching the design system
+    mermaid.initialize({
+      startOnLoad: false,
+      theme: 'base',
+      securityLevel: 'loose',
+      themeVariables: {
+        // Primary colors - using Syntra cyan accent
+        primaryColor: '#6FE8FF',
+        primaryTextColor: '#030303',
+        primaryBorderColor: '#6FE8FF',
+        
+        // Secondary colors - using graphite
+        secondaryColor: '#111415',
+        secondaryTextColor: '#8C95A3',
+        secondaryBorderColor: '#8C95A3',
+        
+        // Tertiary colors
+        tertiaryColor: '#030303',
+        tertiaryTextColor: '#f8f8f8',
+        tertiaryBorderColor: 'rgba(255, 255, 255, 0.1)',
+        
+        // Background and surface colors
+        background: '#030303',
+        mainBkg: '#111415',
+        secondBkg: '#030303',
+        tertiaryBkg: '#111415',
+        
+        // Text colors
+        textColor: '#f8f8f8',
+        secondaryTextColor: '#8C95A3',
+        tertiaryTextColor: '#6FE8FF',
+        
+        // Line and edge colors
+        lineColor: '#6FE8FF',
+        border1: 'rgba(111, 232, 255, 0.3)',
+        border2: 'rgba(140, 149, 163, 0.2)',
+        
+        // Node colors
+        nodeBkg: '#111415',
+        nodeBorder: '#6FE8FF',
+        clusterBkg: '#030303',
+        clusterBorder: 'rgba(111, 232, 255, 0.2)',
+        
+        // Default node text
+        defaultTextColor: '#f8f8f8',
+        
+        // Edge label
+        edgeLabelBackground: '#111415',
+        edgeLabelTextColor: '#8C95A3',
+        
+        // Note colors
+        noteBkgColor: '#111415',
+        noteTextColor: '#f8f8f8',
+        noteBorderColor: '#6FE8FF',
+        
+        // Actor colors (sequence diagrams)
+        actorBorder: '#6FE8FF',
+        actorBkg: '#111415',
+        actorTextColor: '#f8f8f8',
+        actorLineColor: '#6FE8FF',
+        
+        // Signal colors (sequence diagrams)
+        signalColor: '#6FE8FF',
+        signalTextColor: '#f8f8f8',
+        
+        // Activation box colors
+        activationBorderColor: '#6FE8FF',
+        activationBkgColor: 'rgba(111, 232, 255, 0.1)',
+        
+        // Sequence number colors
+        sequenceNumberColor: '#030303',
+      },
+    })
+    
     async function renderMermaid() {
       try {
         renderCounter.current += 1
@@ -323,13 +423,96 @@ function MermaidDiagram({ definition }) {
 }
 
 function PlantUmlDiagram({ definition }) {
+  // Inject Syntra dark theme skinparams if not already present
+  const enhancedDefinition = useMemo(() => {
+    const trimmed = definition.trim()
+    
+    // Check if skinparams are already defined
+    if (trimmed.includes('skinparam')) {
+      return definition
+    }
+    
+    // Add Syntra dark theme skinparams at the beginning
+    const themeParams = `skinparam backgroundColor #030303
+skinparam defaultFontColor #f8f8f8
+skinparam defaultFontName "Space Grotesk"
+skinparam defaultFontSize 14
+
+' Sequence diagram colors
+skinparam sequence {
+  ArrowColor #6FE8FF
+  ActorBorderColor #6FE8FF
+  ActorBackgroundColor #111415
+  LifeLineBorderColor #6FE8FF
+  LifeLineBackgroundColor #030303
+  ParticipantBorderColor #6FE8FF
+  ParticipantBackgroundColor #111415
+  ParticipantFontColor #f8f8f8
+  BoxBorderColor #6FE8FF
+  BoxBackgroundColor #111415
+  NoteBorderColor #6FE8FF
+  NoteBackgroundColor #111415
+  NoteFontColor #f8f8f8
+  ActivationBorderColor #6FE8FF
+  ActivationBackgroundColor #1A3A42
+}
+
+' Class diagram colors
+skinparam class {
+  BackgroundColor #111415
+  BorderColor #6FE8FF
+  ArrowColor #6FE8FF
+  AttributeFontColor #8C95A3
+  MethodFontColor #f8f8f8
+  StereotypeFontColor #6FE8FF
+}
+
+' Activity diagram colors
+skinparam activity {
+  BackgroundColor #111415
+  BorderColor #6FE8FF
+  FontColor #f8f8f8
+  StartColor #6FE8FF
+  EndColor #6FE8FF
+  DiamondBackgroundColor #111415
+  DiamondBorderColor #6FE8FF
+}
+
+' Component diagram colors
+skinparam component {
+  BackgroundColor #111415
+  BorderColor #6FE8FF
+  ArrowColor #6FE8FF
+  InterfaceBackgroundColor #030303
+  InterfaceBorderColor #6FE8FF
+}
+
+' State diagram colors
+skinparam state {
+  BackgroundColor #111415
+  BorderColor #6FE8FF
+  ArrowColor #6FE8FF
+  StartColor #6FE8FF
+  EndColor #6FE8FF
+}
+
+`
+    
+    // Insert theme params after @startuml or at the beginning
+    if (trimmed.startsWith('@startuml')) {
+      return definition.replace('@startuml', `@startuml\n${themeParams}`)
+    }
+    
+    return `${themeParams}\n${definition}`
+  }, [definition])
+
   const encoded = useMemo(() => {
     try {
-      return encodePlantUml(definition)
+      return encodePlantUml(enhancedDefinition)
     } catch {
       return null
     }
-  }, [definition])
+  }, [enhancedDefinition])
 
   if (!encoded) {
     return (
