@@ -2,5 +2,9 @@
     {
         "title":"Overall Architecture",
         "description":"this file should show the overall architecture of the repo and also all the api calls end to end"
+    },
+    {
+        "title":"API Endpoints",
+        "description":"This file should outline all the api endpoints from end-end."
     }
 ]
